@@ -37,23 +37,29 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // إنشاء مؤقت اللعبة
     const timer = new GameTimer(8, 
-        // onTick - يتم استدعاؤه كل مرة يتم تحديث المؤقت
-        (remaining) => {
-            timerElement.textContent = remaining;
-            
-            // تغيير لون المؤقت حسب الوقت المتبقي
-            if (remaining <= 3) {
-                timerElement.style.backgroundColor = '#F24C4C';
-            } else {
-                timerElement.style.backgroundColor = '#22A699';
-            }
-        }, 
-        // onTimeout - يتم استدعاؤه عند انتهاء الوقت
-        () => {
-            console.log('انتهى الوقت!');
-            handleTimeout();
+    // onTick - يتم استدعاؤه كل مرة يتم تحديث المؤقت
+    (remaining) => {
+        timerElement.textContent = remaining;
+        
+        // تغيير لون المؤقت حسب الوقت المتبقي
+        if (remaining <= 3) {
+            timerElement.style.backgroundColor = '#F24C4C';
+        } else {
+            timerElement.style.backgroundColor = '#22A699';
         }
-    );
+    }, 
+    // onTimeout - يتم استدعاؤه عند انتهاء الوقت
+    () => {
+        console.log('انتهى الوقت!');
+        // التأكد من أنه دور اللاعب الحالي
+        if (playerId === roomRef.child('gameState/currentTurn').key) {
+            // مباشرة إظهار إشعار واضح بانتهاء الوقت
+            showTimeoutStatus();
+            // إضافة سترايك مباشرة دون تأخير
+            addStrike();
+        }
+    }
+);
     
     // مرجع الغرفة
     const roomRef = database.ref('rooms/' + roomCode);
@@ -168,49 +174,52 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // إضافة سترايك
     function addStrike() {
-        roomRef.transaction(data => {
-            if (data === null) return data;
+    console.log('إضافة سترايك...');
+    
+    roomRef.transaction(data => {
+        if (data === null) return data;
+        
+        const strikes = (data.players[playerId]?.strikes || 0) + 1;
+        console.log(`تحديث السترايك: ${strikes}`);
+        
+        // تحديث عدد السترايكات
+        data.players[playerId].strikes = strikes;
+        
+        // إذا وصل عدد السترايكات إلى 3
+        if (strikes >= 3) {
+            // أضف نقطة للخصم
+            data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
             
-            const strikes = (data.players[playerId]?.strikes || 0) + 1;
+            // أعد تعيين السترايكات
+            data.players[playerId].strikes = 0;
+            data.players[opponentId].strikes = 0;
             
-            // تحديث عدد السترايكات
-            data.players[playerId].strikes = strikes;
+            // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
+            if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
+            if (!data.gameState.skipUsed.player1) data.gameState.skipUsed.player1 = {};
+            if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
             
-            // إذا وصل عدد السترايكات إلى 3
-            if (strikes >= 3) {
-                // أضف نقطة للخصم
-                data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
-                
-                // أعد تعيين السترايكات
-                data.players[playerId].strikes = 0;
-                data.players[opponentId].strikes = 0;
-                
-                // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
-                if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
-                if (!data.gameState.skipUsed.player1) data.gameState.skipUsed.player1 = {};
-                if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
-                
-                // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1);
-                
-                // التحقق من انتهاء الأسئلة (5 أسئلة)
-                if (data.gameState.currentQuestion >= 5) {
-                    // تعليم الجولة كمنتهية
-                    data.gameState.roundCompleted = true;
-                }
-                
-                // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
-                data.gameState.usedAnswers = {};
+            // الانتقال إلى السؤال التالي
+            data.gameState.currentQuestion = (data.gameState.currentQuestion + 1);
+            
+            // التحقق من انتهاء الأسئلة (5 أسئلة)
+            if (data.gameState.currentQuestion >= 5) {
+                // تعليم الجولة كمنتهية
+                data.gameState.roundCompleted = true;
             }
             
-            // تغيير الدور
-            data.gameState.currentTurn = opponentId;
-            
-            return data;
-        }).then(() => {
-            // التحقق من انتهاء الجولة بعد إجراء التحديث
-            checkRoundCompletion();
-        });
+            // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
+            data.gameState.usedAnswers = {};
+        }
+        
+        // تغيير الدور
+        data.gameState.currentTurn = opponentId;
+        
+        return data;
+    }).then(() => {
+        // التحقق من انتهاء الجولة بعد إجراء التحديث
+        checkRoundCompletion();
+    });
     }
     
     // التحقق من انتهاء الجولة
@@ -234,6 +243,29 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => {
             gameStatus.classList.add('hidden');
         }, 3000);
+    }
+    function showTimeoutStatus() {
+    // عرض إشعار بشكل واضح وبارز
+    const timeoutEl = document.createElement('div');
+    timeoutEl.className = 'timeout-alert';
+    timeoutEl.textContent = '⏰ انتهى الوقت!';
+    document.body.appendChild(timeoutEl);
+    
+    // إظهار الإشعار بتأثير مرئي
+    setTimeout(() => {
+        timeoutEl.classList.add('show');
+    }, 10);
+    
+    // إظهار إشعار في منطقة حالة اللعبة أيضًا
+    showStatus('انتهى الوقت! (+1 سترايك)', 'error');
+    
+    // إزالة الإشعار بعد 2 ثانية
+    setTimeout(() => {
+        timeoutEl.classList.remove('show');
+        setTimeout(() => {
+            document.body.removeChild(timeoutEl);
+        }, 300);
+    }, 2000);
     }
     
     // معالجة تقديم الإجابة
