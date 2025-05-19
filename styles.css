@@ -1,0 +1,364 @@
+/* القواعد الأساسية */
+:root {
+    --primary-color: #22A699;
+    --secondary-color: #F2BE22;
+    --danger-color: #F24C4C;
+    --success-color: #3CCF4E;
+    --background-color: #f5f5f5;
+    --text-color: #333;
+    --light-text: #777;
+    --border-radius: 8px;
+    --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Tajawal', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    direction: rtl;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* الأزرار */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    transition: var(--transition);
+    margin: 5px;
+    text-align: center;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn.primary {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.btn.secondary {
+    background-color: var(--secondary-color);
+    color: white;
+}
+
+.btn.danger {
+    background-color: var(--danger-color);
+    color: white;
+}
+
+.btn.primary:hover:not(:disabled),
+.btn.secondary:hover:not(:disabled),
+.btn.danger:hover:not(:disabled) {
+    filter: brightness(1.1);
+    transform: translateY(-2px);
+}
+
+.buttons-container {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin: 20px 0;
+}
+
+/* النماذج */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    font-size: 16px;
+}
+
+#join-status {
+    margin: 10px 0;
+}
+
+#join-status .error {
+    color: var(--danger-color);
+    background-color: rgba(242, 76, 76, 0.1);
+    padding: 10px;
+    border-radius: var(--border-radius);
+    border-right: 3px solid var(--danger-color);
+}
+
+#join-status .success {
+    color: var(--success-color);
+    background-color: rgba(60, 207, 78, 0.1);
+    padding: 10px;
+    border-radius: var(--border-radius);
+    border-right: 3px solid var(--success-color);
+}
+
+#join-status .info {
+    color: var(--primary-color);
+    background-color: rgba(34, 166, 153, 0.1);
+    padding: 10px;
+    border-radius: var(--border-radius);
+    border-right: 3px solid var(--primary-color);
+}
+
+/* الشاشات */
+.screen {
+    display: none;
+    min-height: 100vh;
+    padding: 20px 0;
+}
+
+.screen.active {
+    display: block;
+}
+
+#welcome-screen {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+#welcome-screen h1 {
+    color: var(--primary-color);
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+}
+
+#created-room-info,
+#join-room-form {
+    margin-top: 20px;
+    padding: 20px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+/* شاشة الانتظار */
+#waiting-screen {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.loader {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(34, 166, 153, 0.2);
+    border-top: 5px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* شاشة اللعبة */
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.player-info {
+    text-align: center;
+}
+
+.score {
+    font-size: 1.8rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.game-status {
+    text-align: center;
+}
+
+.round-info, .turn-info {
+    margin: 5px 0;
+    font-weight: 600;
+}
+
+.game-content {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.round-section {
+    padding: 15px;
+}
+
+.question-container {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.question-container h3 {
+    margin-bottom: 20px;
+    font-size: 1.3rem;
+    line-height: 1.5;
+}
+
+.answer-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 20px auto;
+    max-width: 500px;
+}
+
+.answer-section input {
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    font-size: 16px;
+    width: 100%;
+}
+
+/* جولة الجرس */
+.bell-button {
+    padding: 20px;
+    font-size: 24px;
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 120px;
+    height: 120px;
+    margin: 20px auto;
+    display: block;
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.bell-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* شاشة النتائج */
+.results-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 30px 0;
+}
+
+.player-result {
+    text-align: center;
+    padding: 20px;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    flex: 1;
+    max-width: 200px;
+}
+
+.vs {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 0 20px;
+}
+
+.score-big {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 10px 0;
+}
+
+#winner-announcement {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 20px 0;
+    padding: 15px;
+    background-color: rgba(60, 207, 78, 0.1);
+    border-radius: var(--border-radius);
+}
+
+/* تحسينات للأجهزة المحمولة */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+    }
+    
+    .game-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .player-info {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .player-info h3 {
+        margin-right: 10px;
+    }
+    
+    .results-container {
+        flex-direction: column;
+        gap: 20px;
+    }
+    
+    .player-result {
+        max-width: 100%;
+    }
+    
+    .vs {
+        margin: 10px 0;
+    }
+    
+    .bell-button {
+        width: 100px;
+        height: 100px;
+        font-size: 20px;
+    }
+}
