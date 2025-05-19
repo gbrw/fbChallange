@@ -405,3 +405,69 @@ h2 {
         width: 100%;
     }
 }
+
+/* إضافات لنمط صفحة النتائج */
+.results-screen {
+    text-align: center;
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 30px;
+}
+
+.results-container {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    margin: 40px 0;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.player-result {
+    background-color: #f9f9f9;
+    padding: 30px;
+    border-radius: var(--border-radius);
+    min-width: 200px;
+    transition: all 0.3s ease;
+}
+
+.player-result.winner {
+    background-color: rgba(60, 207, 78, 0.1);
+    border: 2px solid var(--success-color);
+    transform: scale(1.05);
+}
+
+.player-result h2 {
+    margin-bottom: 15px;
+}
+
+.final-score {
+    font-size: 3rem;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.winner-announcement {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin: 30px 0;
+    padding: 15px;
+    background-color: rgba(60, 207, 78, 0.1);
+    border-radius: var(--border-radius);
+}
+
+.vs {
+    font-size: 2rem;
+    font-weight: bold;
+}
+
+@media (max-width: 768px) {
+    .results-container {
+        flex-direction: column;
+    }
+    
+    .vs {
+        margin: 10px 0;
+    }
+}
