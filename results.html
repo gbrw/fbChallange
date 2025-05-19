@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>النتائج النهائية | تحدي كرة القدم</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="results-screen">
+            <h1>انتهت جولة "ماذا تعرف؟"</h1>
+            
+            <div class="results-container">
+                <div class="player-result">
+                    <h2 id="player1-name">اللاعب 1</h2>
+                    <div class="final-score" id="player1-score">0</div>
+                </div>
+                
+                <div class="vs">VS</div>
+                
+                <div class="player-result">
+                    <h2 id="player2-name">اللاعب 2</h2>
+                    <div class="final-score" id="player2-score">0</div>
+                </div>
+            </div>
+            
+            <div class="winner-announcement" id="winner-announcement"></div>
+            
+            <div class="buttons-container">
+                <a href="index.html" class="btn primary">العودة للرئيسية</a>
+                <a href="#" id="play-again-btn" class="btn secondary">لعب جولة جديدة</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // الحصول على معلومات اللعبة من التخزين المحلي أو معلمات URL
+            const roomCode = localStorage.getItem('roomCode');
+            const playerId = localStorage.getItem('playerId');
+            
+            if (!roomCode) {
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // مرجع الغرفة
+            const roomRef = database.ref('rooms/' + roomCode);
+            
+            // الحصول على بيانات الغرفة
+            roomRef.once('value', snapshot => {
+                if (!snapshot.exists()) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+                
+                const roomData = snapshot.val();
+                const players = roomData.players || {};
+                
+                // عرض أسماء اللاعبين والنقاط
+                if (players.player1) {
+                    document.getElementById('player1-name').textContent = players.player1.name;
+                    document.getElementById('player1-score').textContent = players.player1.score || 0;
+                }
+                
+                if (players.player2) {
+                    document.getElementById('player2-name').textContent = players.player2.name;
+                    document.getElementById('player2-score').textContent = players.player2.score || 0;
+                }
+                
+                // تحديد الفائز
+                const score1 = players.player1?.score || 0;
+                const score2 = players.player2?.score || 0;
+                
+                if (score1 > score2) {
+                    document.getElementById('winner-announcement').textContent = `الفائز: ${players.player1.name}! 🎉`;
+                    document.getElementById('player1-score').parentElement.classList.add('winner');
+                } else if (score2 > score1) {
+                    document.getElementById('winner-announcement').textContent = `الفائز: ${players.player2.name}! 🎉`;
+                    document.getElementById('player2-score').parentElement.classList.add('winner');
+                } else {
+                    document.getElementById('winner-announcement').textContent = `تعادل! 🤝`;
+                }
+            });
+            
+            // زر اللعب مرة أخرى
+            document.getElementById('play-again-btn').addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // إعادة تهيئة الغرفة لجولة جديدة
+                roomRef.child('gameState').update({
+                    currentQuestion: 0,
+                    currentTurn: 'player1',
+                    skipUsed: {},
+                    usedAnswers: {}
+                }).then(() => {
+                    // إعادة تعيين السترايكات
+                    roomRef.child('players').update({
+                        'player1/strikes': 0,
+                        'player2/strikes': 0
+                    }).then(() => {
+                        // الانتقال إلى صفحة اللعبة
+                        window.location.href = 'game.html?room=' + roomCode;
+                    });
+                });
+            });
+        });
+    </script>
+</body>
+</html>
