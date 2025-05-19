@@ -1,4 +1,4 @@
-// منطق اللعبة الرئيسي - الإصدار النهائي مع إصلاح التايمر
+// منطق اللعبة الرئيسي - النسخة النهائية
 
 document.addEventListener('DOMContentLoaded', function() {
     // التأكد من وجود معلومات اللاعب
@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentQuestion = 0;
     let gameQuestions = [];
     let opponentId = playerId === 'player1' ? 'player2' : 'player1';
+    let lastKnownTurn = '';
     
     // مراجع العناصر
     const timerElement = document.getElementById('timer');
@@ -99,6 +100,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const skipUsed = roomData.gameState?.skipUsed?.[playerId]?.[currentQuestion] || false;
         skipButton.disabled = !isPlayerTurn || skipUsed;
         
+        // التغيير في الدور: إذا تغير الدور عن آخر مرة
+        if (lastKnownTurn !== currentTurn) {
+            console.log(`تغير الدور من ${lastKnownTurn} إلى ${currentTurn}`);
+            lastKnownTurn = currentTurn;
+            
+            // إذا كان الدور دور اللاعب الحالي، ابدأ مؤقت جديد
+            if (isPlayerTurn) {
+                // بدء التايمر للاعب الجديد
+                startNewTurn();
+            }
+        }
+        
         // التحقق من حالة المؤقت
         if (gameState.timerEndTime) {
             updateTimerDisplay(gameState.timerEndTime, gameState.timerActive);
@@ -107,13 +120,6 @@ document.addEventListener('DOMContentLoaded', function() {
             if (gameState.timerExpired && !document.querySelector('.timeout-alert')) {
                 // ربما تم إضافة السترايك بالفعل، فقط أظهر الرسالة
                 showTimeoutAlert();
-            }
-        }
-        
-        // بدء مؤقت جديد إذا انتقل الدور إلى اللاعب الحالي
-        if (isPlayerTurn && !gameState.timerActive && !gameState.timerExpired) {
-            if (playerId === currentTurn) {
-                startNewTurn();
             }
         }
     });
@@ -178,6 +184,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // بدء دور جديد
     function startNewTurn() {
+        console.log('بدء دور جديد للاعب: ' + playerId);
         showStatus('دورك! لديك 8 ثوانٍ للإجابة', 'info');
         answerInput.value = '';
         answerInput.focus();
