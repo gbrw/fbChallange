@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إنشاء غرفة جديدة | تحدي كرة القدم</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="create-room-screen">
+            <h1>إنشاء غرفة جديدة</h1>
+            
+            <div class="form-container">
+                <form id="create-room-form">
+                    <div class="form-group">
+                        <label for="player-name">اسم اللاعب:</label>
+                        <input type="text" id="player-name" placeholder="أدخل اسمك هنا" required>
+                    </div>
+                    
+                    <div id="create-status"></div>
+                    
+                    <div class="buttons-container">
+                        <button type="submit" class="btn primary">إنشاء غرفة</button>
+                        <a href="index.html" class="btn secondary">العودة</a>
+                    </div>
+                </form>
+            </div>
+            
+            <div id="room-created" class="hidden">
+                <div class="room-info">
+                    <h2>تم إنشاء الغرفة بنجاح!</h2>
+                    <p>رمز الغرفة الخاص بك:</p>
+                    <div class="room-code-display" id="room-code-display">XXXXXX</div>
+                    <p>شارك هذا الرمز مع خصمك للانضمام إلى اللعبة</p>
+                </div>
+                
+                <a href="#" id="go-to-waiting-btn" class="btn primary">الانتقال إلى غرفة الانتظار</a>
+                <a href="index.html" class="btn danger">إلغاء</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('create-room-form');
+            const createStatus = document.getElementById('create-status');
+            const roomCreated = document.getElementById('room-created');
+            const roomCodeDisplay = document.getElementById('room-code-display');
+            const goToWaitingBtn = document.getElementById('go-to-waiting-btn');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const playerName = document.getElementById('player-name').value.trim();
+                if (!playerName) {
+                    showStatus(createStatus, 'يرجى إدخال اسم اللاعب', 'error');
+                    return;
+                }
+                
+                // إنشاء رمز غرفة عشوائي
+                const roomCode = generateRoomCode();
+                
+                // إنشاء غرفة في قاعدة البيانات
+                const roomRef = database.ref('rooms/' + roomCode);
+                
+                roomRef.set({
+                    status: 'waiting',
+                    createdAt: firebase.database.ServerValue.TIMESTAMP,
+                    players: {
+                        player1: {
+                            name: playerName,
+                            score: 0,
+                            strikes: 0,
+                            skipUsed: false
+                        }
+                    },
+                    gameState: {
+                        currentRound: 1,
+                        currentQuestion: 0,
+                        currentTurn: 'player1',
+                        timeLeft: 8,
+                        questions: {}
+                    }
+                }).then(() => {
+                    console.log('تم إنشاء الغرفة بنجاح:', roomCode);
+                    
+                    // حفظ بيانات اللاعب في التخزين المحلي
+                    localStorage.setItem('roomCode', roomCode);
+                    localStorage.setItem('playerName', playerName);
+                    localStorage.setItem('playerId', 'player1');
+                    localStorage.setItem('isCreator', 'true');
+                    
+                    // إظهار معلومات الغرفة
+                    roomCodeDisplay.textContent = roomCode;
+                    form.classList.add('hidden');
+                    roomCreated.classList.remove('hidden');
+                    
+                    // ربط رابط الانتقال إلى غرفة الانتظار
+                    goToWaitingBtn.href = 'waiting-room.html?room=' + roomCode;
+                    
+                    // جلب الأسئلة من قاعدة البيانات
+                    loadQuestionsForRoom(roomCode);
+                }).catch(error => {
+                    console.error('خطأ في إنشاء الغرفة:', error);
+                    showStatus(createStatus, 'حدث خطأ أثناء إنشاء الغرفة: ' + error.message, 'error');
+                });
+            });
+            
+            // وظيفة لجلب الأسئلة وتخصيصها للغرفة
+            function loadQuestionsForRoom(roomCode) {
+                // جلب الأسئلة من قاعدة البيانات
+                database.ref('questions').limitToFirst(5).once('value')
+                    .then(snapshot => {
+                        if (snapshot.exists()) {
+                            const questions = snapshot.val();
+                            const questionsArray = Object.values(questions);
+                            
+                            // تحديث الغرفة بالأسئلة
+                            const updates = {};
+                            questionsArray.forEach((question, index) => {
+                                updates[`rooms/${roomCode}/gameState/questions/${index}`] = question;
+                            });
+                            
+                            return database.ref().update(updates);
+                        } else {
+                            // إذا لم تكن هناك أسئلة، استخدم أسئلة افتراضية
+                            const defaultQuestions = [
+                                { question: "اذكر لاعبين بحرف D", answers: ["ديبالا", "دروجبا", "دي بروين", "ديل بييرو", "دافيد فيا"] },
+                                { question: "اذكر 3 أندية فازت بدوري أبطال أوروبا", answers: ["ريال مدريد", "برشلونة", "ليفربول", "بايرن ميونخ", "مانشستر يونايتد", "تشيلسي", "ميلان"] },
+                                { question: "اذكر لاعبين لعبوا مع كريستيانو رونالدو", answers: ["بنزيما", "بيل", "راموس", "مودريتش", "كاسياس", "ماركيزيو", "روني"] },
+                                { question: "اذكر لاعبين فازوا بكأس العالم", answers: ["ميسي", "مبابي", "زيدان", "رونالدو البرازيلي", "بيليه", "مارادونا"] },
+                                { question: "اذكر 3 حراس مرمى مشهورين", answers: ["كاسياس", "بوفون", "نوير", "تشيك", "دي خيا", "كورتوا"] }
+                            ];
+                            
+                            const updates = {};
+                            defaultQuestions.forEach((question, index) => {
+                                updates[`rooms/${roomCode}/gameState/questions/${index}`] = question;
+                            });
+                            
+                            return database.ref().update(updates);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('خطأ في جلب الأسئلة:', error);
+                    });
+            }
+        });
+    </script>
+</body>
+</html>

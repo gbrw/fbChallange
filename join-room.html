@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>الانضمام إلى غرفة | تحدي كرة القدم</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="join-room-screen">
+            <h1>الانضمام إلى غرفة</h1>
+            
+            <div class="form-container">
+                <form id="join-room-form">
+                    <div class="form-group">
+                        <label for="player-name">اسم اللاعب:</label>
+                        <input type="text" id="player-name" placeholder="أدخل اسمك هنا" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="room-code">رمز الغرفة:</label>
+                        <input type="text" id="room-code" placeholder="أدخل رمز الغرفة" maxlength="6" required>
+                    </div>
+                    
+                    <div id="join-status"></div>
+                    
+                    <div class="buttons-container">
+                        <button type="submit" class="btn primary">انضمام</button>
+                        <a href="index.html" class="btn secondary">العودة</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const form = document.getElementById('join-room-form');
+            const joinStatus = document.getElementById('join-status');
+            
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const playerName = document.getElementById('player-name').value.trim();
+                const roomCode = document.getElementById('room-code').value.trim().toUpperCase();
+                
+                if (!playerName) {
+                    showStatus(joinStatus, 'يرجى إدخال اسم اللاعب', 'error');
+                    return;
+                }
+                
+                if (!roomCode) {
+                    showStatus(joinStatus, 'يرجى إدخال رمز الغرفة', 'error');
+                    return;
+                }
+                
+                showStatus(joinStatus, 'جارِ الانضمام...', 'info');
+                
+                // البحث عن الغرفة في قاعدة البيانات
+                const roomRef = database.ref('rooms/' + roomCode);
+                
+                roomRef.once('value')
+                    .then(snapshot => {
+                        if (!snapshot.exists()) {
+                            throw new Error('الغرفة غير موجودة');
+                        }
+                        
+                        const roomData = snapshot.val();
+                        
+                        if (roomData.status !== 'waiting') {
+                            throw new Error('اللعبة قد بدأت بالفعل');
+                        }
+                        
+                        if (roomData.players && roomData.players.player2) {
+                            throw new Error('الغرفة ممتلئة');
+                        }
+                        
+                        // إضافة اللاعب الثاني
+                        return roomRef.child('players').update({
+                            player2: {
+                                name: playerName,
+                                score: 0,
+                                strikes: 0,
+                                skipUsed: false
+                            }
+                        });
+                    })
+                    .then(() => {
+                        // تحديث حالة الغرفة
+                        return roomRef.update({
+                            status: 'ready'
+                        });
+                    })
+                    .then(() => {
+                        console.log('تم الانضمام إلى الغرفة بنجاح');
+                        
+                        // حفظ بيانات اللاعب في التخزين المحلي
+                        localStorage.setItem('roomCode', roomCode);
+                        localStorage.setItem('playerName', playerName);
+                        localStorage.setItem('playerId', 'player2');
+                        localStorage.setItem('isCreator', 'false');
+                        
+                        // الانتقال إلى صفحة اللعبة
+                        window.location.href = 'game.html?room=' + roomCode;
+                    })
+                    .catch(error => {
+                        console.error('خطأ في الانضمام إلى الغرفة:', error);
+                        showStatus(joinStatus, 'خطأ: ' + error.message, 'error');
+                    });
+            });
+            
+            // الاستماع لحدث Enter في حقل رمز الغرفة
+            document.getElementById('room-code').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    form.dispatchEvent(new Event('submit'));
+                }
+            });
+        });
+    </script>
+</body>
+</html>

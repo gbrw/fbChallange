@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>غرفة الانتظار | تحدي كرة القدم</title>
+    <link rel="stylesheet" href="css/style.css">
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="waiting-room-screen">
+            <h1>غرفة الانتظار</h1>
+            
+            <div class="room-info">
+                <h2>رمز الغرفة: <span id="room-code-display" class="room-code-display">XXXXXX</span></h2>
+                <p>شارك هذا الرمز مع خصمك للانضمام إلى اللعبة</p>
+            </div>
+            
+            <div class="waiting-animation">
+                <div class="loader"></div>
+                <p>بانتظار انضمام اللاعب الآخر...</p>
+            </div>
+            
+            <div class="players-list">
+                <h3>اللاعبون:</h3>
+                <ul id="players-list">
+                    <li id="player1-info">
+                        <span class="player-name" id="player1-name">-</span>
+                        <span class="status ready">✓</span>
+                    </li>
+                    <li id="player2-info">
+                        <span class="player-name" id="player2-name">بانتظار اللاعب...</span>
+                        <span class="status waiting">⌛</span>
+                    </li>
+                </ul>
+            </div>
+            
+            <a href="#" id="cancel-game-btn" class="btn danger">إلغاء اللعبة</a>
+        </div>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // الحصول على رمز الغرفة من التخزين المحلي
+            const roomCode = localStorage.getItem('roomCode') || getUrlParameter('room');
+            const playerId = localStorage.getItem('playerId');
+            
+            if (!roomCode || !playerId) {
+                alert('معلومات اللاعب غير متوفرة. سيتم توجيهك إلى الصفحة الرئيسية.');
+                window.location.href = 'index.html';
+                return;
+            }
+            
+            // عرض رمز الغرفة
+            document.getElementById('room-code-display').textContent = roomCode;
+            
+            // الاستماع للتغييرات في الغرفة
+            const roomRef = database.ref('rooms/' + roomCode);
+            
+            roomRef.on('value', snapshot => {
+                if (!snapshot.exists()) {
+                    alert('تم حذف الغرفة.');
+                    window.location.href = 'index.html';
+                    return;
+                }
+                
+                const roomData = snapshot.val();
+                
+                // تحديث قائمة اللاعبين
+                updatePlayersList(roomData.players);
+                
+                // التحقق من حالة الغرفة
+                if (roomData.status === 'ready') {
+                    console.log('الغرفة جاهزة للعب!');
+                    window.location.href = 'game.html?room=' + roomCode;
+                }
+            });
+            
+            // زر إلغاء اللعبة
+            document.getElementById('cancel-game-btn').addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                if (confirm('هل أنت متأكد من إلغاء اللعبة؟')) {
+                    roomRef.remove()
+                        .then(() => {
+                            localStorage.removeItem('roomCode');
+                            localStorage.removeItem('playerName');
+                            localStorage.removeItem('playerId');
+                            localStorage.removeItem('isCreator');
+                            
+                            window.location.href = 'index.html';
+                        })
+                        .catch(error => {
+                            console.error('خطأ في حذف الغرفة:', error);
+                            alert('حدث خطأ أثناء إلغاء اللعبة: ' + error.message);
+                        });
+                }
+            });
+            
+            // تحديث قائمة اللاعبين
+            function updatePlayersList(players) {
+                if (players && players.player1) {
+                    document.getElementById('player1-name').textContent = players.player1.name;
+                }
+                
+                if (players && players.player2) {
+                    document.getElementById('player2-name').textContent = players.player2.name;
+                    document.getElementById('player2-info').querySelector('.status').className = 'status ready';
+                    document.getElementById('player2-info').querySelector('.status').textContent = '✓';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
