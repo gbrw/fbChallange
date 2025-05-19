@@ -68,25 +68,29 @@
                 // إنشاء غرفة في قاعدة البيانات
                 const roomRef = database.ref('rooms/' + roomCode);
                 
-                roomRef.set({
-                    status: 'waiting',
-                    createdAt: firebase.database.ServerValue.TIMESTAMP,
-                    players: {
-                        player1: {
-                            name: playerName,
-                            score: 0,
-                            strikes: 0,
-                            skipUsed: false
-                        }
-                    },
-                    gameState: {
-                        currentRound: 1,
-                        currentQuestion: 0,
-                        currentTurn: 'player1',
-                        timeLeft: 8,
-                        questions: {}
-                    }
-                }).then(() => {
+                // إضافة حقول التايمر عند إنشاء الغرفة
+roomRef.set({
+    status: 'waiting',
+    createdAt: firebase.database.ServerValue.TIMESTAMP,
+    players: {
+        player1: {
+            name: playerName,
+            score: 0,
+            strikes: 0,
+            skipUsed: false
+        }
+    },
+    gameState: {
+        currentRound: 1,
+        currentQuestion: 0,
+        currentTurn: 'player1',
+        timeLeft: 8,
+        timerActive: false,
+        timerEndTime: 0,
+        timerExpired: false,
+        questions: {}
+    }
+}).then(() => {
                     console.log('تم إنشاء الغرفة بنجاح:', roomCode);
                     
                     // حفظ بيانات اللاعب في التخزين المحلي
