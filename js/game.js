@@ -1,4 +1,4 @@
-// منطق اللعبة الرئيسي - النسخة النهائية مع إصلاح المؤقت والسترايك
+// منطق اللعبة الرئيسي - الإصدار النهائي مع إصلاح التايمر
 
 document.addEventListener('DOMContentLoaded', function() {
     // التأكد من وجود معلومات اللاعب
@@ -35,16 +35,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const player1Container = document.getElementById('player1-container');
     const player2Container = document.getElementById('player2-container');
     
-    // مؤقت محلي للتحكم في الوقت
-    let timerInterval = null;
+    // مؤقت محلي لعرض العد التنازلي
+    let localTimerInterval = null;
+    let serverTimeOffset = 0;
     
-    // مرجع الغرفة
+    // مراجع Firebase
     const roomRef = database.ref('rooms/' + roomCode);
     
-    // مراجع لمكونات اللعبة في Firebase
-    const gameStateRef = roomRef.child('gameState');
-    const currentTurnRef = gameStateRef.child('currentTurn');
-    const timerRef = gameStateRef.child('timer');
+    // الحصول على فرق الوقت بين السيرفر والعميل
+    database.ref(".info/serverTimeOffset").on('value', function(snap) {
+        serverTimeOffset = snap.val() || 0;
+    });
     
     // الاستماع للتغييرات في الغرفة
     roomRef.on('value', function(snapshot) {
@@ -98,23 +99,209 @@ document.addEventListener('DOMContentLoaded', function() {
         const skipUsed = roomData.gameState?.skipUsed?.[playerId]?.[currentQuestion] || false;
         skipButton.disabled = !isPlayerTurn || skipUsed;
         
-        // تحديث المؤقت مع بيانات من Firebase
-        updateTimerDisplay(gameState.timer);
-        
-        // التحقق من انتهاء الوقت
-        if (gameState.timer && gameState.timer.expired) {
-            // إظهار إشعار انتهاء الوقت لجميع اللاعبين
-            showTimeoutMessage();
+        // التحقق من حالة المؤقت
+        if (gameState.timerEndTime) {
+            updateTimerDisplay(gameState.timerEndTime, gameState.timerActive);
+            
+            // إذا تم تحديد أن الوقت انتهى، أظهر رسالة
+            if (gameState.timerExpired && !document.querySelector('.timeout-alert')) {
+                // ربما تم إضافة السترايك بالفعل، فقط أظهر الرسالة
+                showTimeoutAlert();
+            }
         }
         
-        // إذا انتقل الدور للاعب الحالي وليس هناك مؤقت نشط
-        if (isPlayerTurn && (!gameState.timer || !gameState.timer.active)) {
-            // ابدأ مؤقت جديد
-            if (!gameState.timer || !gameState.timer.expired) {
+        // بدء مؤقت جديد إذا انتقل الدور إلى اللاعب الحالي
+        if (isPlayerTurn && !gameState.timerActive && !gameState.timerExpired) {
+            if (playerId === currentTurn) {
                 startNewTurn();
             }
         }
     });
+    
+    // تحديث المؤقت على الشاشة
+    function updateTimerDisplay(endTime, isActive) {
+        // إلغاء المؤقت الحالي إن وجد
+        if (localTimerInterval) {
+            clearInterval(localTimerInterval);
+            localTimerInterval = null;
+        }
+        
+        if (!isActive) {
+            timerElement.textContent = "0";
+            timerElement.style.backgroundColor = '#F24C4C';
+            return;
+        }
+        
+        // حساب الوقت المتبقي بناءً على الوقت الحالي
+        const now = Date.now() + serverTimeOffset;
+        let timeLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
+        
+        // تحديث عرض المؤقت
+        timerElement.textContent = timeLeft;
+        
+        // تعيين لون المؤقت
+        if (timeLeft <= 3) {
+            timerElement.style.backgroundColor = '#F24C4C';
+        } else {
+            timerElement.style.backgroundColor = '#22A699';
+        }
+        
+        // بدء مؤقت محلي للعد التنازلي
+        if (isActive && timeLeft > 0) {
+            localTimerInterval = setInterval(function() {
+                const currentTime = Date.now() + serverTimeOffset;
+                timeLeft = Math.max(0, Math.ceil((endTime - currentTime) / 1000));
+                
+                // تحديث عرض المؤقت
+                timerElement.textContent = timeLeft;
+                
+                // تغيير لون المؤقت
+                if (timeLeft <= 3) {
+                    timerElement.style.backgroundColor = '#F24C4C';
+                }
+                
+                // إذا انتهى الوقت
+                if (timeLeft === 0) {
+                    clearInterval(localTimerInterval);
+                    localTimerInterval = null;
+                    
+                    // فقط اللاعب الذي هو دوره يقوم بمعالجة انتهاء الوقت
+                    roomRef.child('gameState/currentTurn').once('value', function(turnSnap) {
+                        if (turnSnap.val() === playerId) {
+                            handleTimeout();
+                        }
+                    });
+                }
+            }, 500);
+        }
+    }
+    
+    // بدء دور جديد
+    function startNewTurn() {
+        showStatus('دورك! لديك 8 ثوانٍ للإجابة', 'info');
+        answerInput.value = '';
+        answerInput.focus();
+        
+        // وقت انتهاء المؤقت = الوقت الحالي + 8 ثوانٍ
+        const now = Date.now() + serverTimeOffset;
+        const timerEndTime = now + 8000;
+        
+        // تحديث بيانات المؤقت في Firebase
+        roomRef.child('gameState').update({
+            timerEndTime: timerEndTime,
+            timerActive: true,
+            timerExpired: false
+        });
+    }
+    
+    // معالجة انتهاء الوقت
+    function handleTimeout() {
+        console.log('انتهى الوقت! جاري معالجة انتهاء الوقت...');
+        
+        // تعليم المؤقت كمنتهي
+        roomRef.child('gameState').update({
+            timerActive: false,
+            timerExpired: true
+        }).then(() => {
+            console.log('تم تحديث حالة المؤقت، جاري إضافة سترايك...');
+            
+            // إظهار رسالة انتهاء الوقت
+            showTimeoutAlert();
+            
+            // إضافة سترايك
+            addStrikeOnTimeout();
+        });
+    }
+    
+    // إضافة سترايك عند انتهاء الوقت
+    function addStrikeOnTimeout() {
+        roomRef.transaction(function(data) {
+            if (!data) return data;
+            
+            // الحصول على معرف اللاعب الذي انتهى وقته
+            const turnPlayerId = data.gameState.currentTurn;
+            console.log(`إضافة سترايك للاعب الحالي: ${turnPlayerId}`);
+            
+            // زيادة عدد السترايكات
+            const strikes = (data.players[turnPlayerId]?.strikes || 0) + 1;
+            data.players[turnPlayerId].strikes = strikes;
+            
+            console.log(`عدد السترايكات الجديد: ${strikes}`);
+            
+            // إذا وصل عدد السترايكات إلى 3
+            if (strikes >= 3) {
+                console.log('وصل عدد السترايكات إلى 3، إضافة نقطة للخصم');
+                
+                // تحديد اللاعب الخصم
+                const opponentId = turnPlayerId === 'player1' ? 'player2' : 'player1';
+                
+                // إضافة نقطة للخصم
+                data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
+                
+                // إعادة تعيين السترايكات لكلا اللاعبين
+                data.players.player1.strikes = 0;
+                data.players.player2.strikes = 0;
+                
+                // الانتقال إلى السؤال التالي
+                data.gameState.currentQuestion += 1;
+                
+                // التحقق من انتهاء الأسئلة
+                if (data.gameState.currentQuestion >= 5) {
+                    data.gameState.roundCompleted = true;
+                }
+                
+                // إعادة تعيين الإجابات المستخدمة
+                data.gameState.usedAnswers = {};
+                
+                // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
+                if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
+            }
+            
+            // تغيير الدور
+            const nextPlayer = turnPlayerId === 'player1' ? 'player2' : 'player1';
+            data.gameState.currentTurn = nextPlayer;
+            
+            return data;
+        }).then(function() {
+            console.log('تمت إضافة السترايك بنجاح');
+            
+            // التحقق من انتهاء الجولة
+            checkRoundCompletion();
+        });
+    }
+    
+    // عرض رسالة انتهاء الوقت
+    function showTimeoutAlert() {
+        // حذف أي إشعارات سابقة
+        const existingAlerts = document.querySelectorAll('.timeout-alert');
+        existingAlerts.forEach(alert => {
+            document.body.removeChild(alert);
+        });
+        
+        // إنشاء إشعار جديد
+        const timeoutEl = document.createElement('div');
+        timeoutEl.className = 'timeout-alert';
+        timeoutEl.textContent = '⏰ انتهى الوقت!';
+        document.body.appendChild(timeoutEl);
+        
+        // إظهار الإشعار بتأثير مرئي
+        setTimeout(() => {
+            timeoutEl.classList.add('show');
+        }, 10);
+        
+        // إظهار إشعار في منطقة حالة اللعبة أيضًا
+        showStatus('انتهى الوقت! (+1 سترايك)', 'error');
+        
+        // إزالة الإشعار بعد 2 ثانية
+        setTimeout(() => {
+            timeoutEl.classList.remove('show');
+            setTimeout(() => {
+                if (document.body.contains(timeoutEl)) {
+                    document.body.removeChild(timeoutEl);
+                }
+            }, 300);
+        }, 2000);
+    }
     
     // تحديث معلومات اللاعبين
     function updatePlayersInfo(players) {
@@ -141,183 +328,6 @@ document.addEventListener('DOMContentLoaded', function() {
         } else if (currentTurn === 'player2') {
             player2Container.classList.add('active');
         }
-    }
-    
-    // تحديث عرض المؤقت
-    function updateTimerDisplay(timerData) {
-        if (!timerData) return;
-        
-        // تحديث عرض المؤقت لجميع اللاعبين
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-        }
-        
-        // عرض الوقت المتبقي
-        const timeLeft = timerData.timeLeft || 0;
-        timerElement.textContent = timeLeft;
-        
-        // تغيير لون المؤقت حسب الوقت المتبقي
-        if (timeLeft <= 3) {
-            timerElement.style.backgroundColor = '#F24C4C';
-        } else {
-            timerElement.style.backgroundColor = '#22A699';
-        }
-        
-        // إذا كان المؤقت نشطًا، قم بتحديثه محليًا للعرض فقط
-        if (timerData.active && timeLeft > 0) {
-            const endTime = timerData.endTime;
-            const currentTime = Date.now();
-            let remainingTime = Math.max(0, Math.floor((endTime - currentTime) / 1000));
-            
-            // تحديث العرض المحلي فقط
-            timerElement.textContent = remainingTime;
-            
-            timerInterval = setInterval(() => {
-                const now = Date.now();
-                remainingTime = Math.max(0, Math.floor((endTime - now) / 1000));
-                
-                // تحديث العرض فقط (لا يؤثر على Firebase)
-                timerElement.textContent = remainingTime;
-                
-                // تغيير اللون عند اقتراب الوقت من النهاية
-                if (remainingTime <= 3) {
-                    timerElement.style.backgroundColor = '#F24C4C';
-                }
-                
-                // إذا انتهى الوقت وكان دور اللاعب الحالي
-                if (remainingTime === 0) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
-                    
-                    // فقط اللاعب الذي حان دوره يعالج انتهاء الوقت في Firebase
-                    if (timerData.turnPlayerId === playerId) {
-                        // تأكد من أنه لا يزال دور هذا اللاعب
-                        currentTurnRef.once('value', function(turnSnapshot) {
-                            if (turnSnapshot.val() === playerId) {
-                                handleTimeout();
-                            }
-                        });
-                    }
-                }
-            }, 100);
-        }
-    }
-    
-    // بدء دور جديد
-    function startNewTurn() {
-        showStatus('دورك! لديك 8 ثوانٍ للإجابة', 'info');
-        answerInput.value = '';
-        answerInput.focus();
-        
-        // تحديث بيانات المؤقت في Firebase
-        timerRef.set({
-            timeLeft: 8,
-            active: true,
-            endTime: Date.now() + 8000,
-            expired: false,
-            turnPlayerId: playerId // تخزين معرف اللاعب الذي بدأ المؤقت
-        });
-    }
-    
-    // معالجة انتهاء الوقت
-    function handleTimeout() {
-        console.log('معالجة انتهاء الوقت...');
-        
-        // تحديث حالة المؤقت في Firebase
-        timerRef.update({
-            active: false,
-            timeLeft: 0,
-            expired: true
-        }).then(() => {
-            console.log('تم تحديث حالة المؤقت، جاري إضافة سترايك...');
-            
-            // إضافة سترايك بعد تحديث المؤقت
-            roomRef.transaction(function(data) {
-                if (!data) return data;
-                
-                // الحصول على معرف اللاعب الذي انتهى وقته
-                const turnPlayerId = data.gameState.currentTurn;
-                
-                // زيادة عدد السترايكات
-                const strikes = (data.players[turnPlayerId]?.strikes || 0) + 1;
-                data.players[turnPlayerId].strikes = strikes;
-                
-                console.log(`إضافة سترايك للاعب ${turnPlayerId}: ${strikes}`);
-                
-                // إذا وصل عدد السترايكات إلى 3
-                if (strikes >= 3) {
-                    // تحديد اللاعب الخصم
-                    const opponentId = turnPlayerId === 'player1' ? 'player2' : 'player1';
-                    
-                    // إضافة نقطة للخصم
-                    data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
-                    
-                    // إعادة تعيين السترايكات لكلا اللاعبين
-                    data.players.player1.strikes = 0;
-                    data.players.player2.strikes = 0;
-                    
-                    // الانتقال إلى السؤال التالي
-                    data.gameState.currentQuestion += 1;
-                    
-                    // التحقق من انتهاء الأسئلة
-                    if (data.gameState.currentQuestion >= 5) {
-                        data.gameState.roundCompleted = true;
-                    }
-                    
-                    // إعادة تعيين الإجابات المستخدمة
-                    data.gameState.usedAnswers = {};
-                    
-                    // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
-                    if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
-                }
-                
-                // تغيير الدور
-                const nextPlayer = turnPlayerId === 'player1' ? 'player2' : 'player1';
-                data.gameState.currentTurn = nextPlayer;
-                
-                // إعادة تعيين المؤقت
-                if (!data.gameState.timer) data.gameState.timer = {};
-                data.gameState.timer.active = false;
-                
-                return data;
-            }).then(() => {
-                console.log('تمت إضافة السترايك وتحديث اللعبة');
-                // التحقق من انتهاء الجولة
-                checkRoundCompletion();
-            });
-        });
-    }
-    
-    // عرض رسالة انتهاء الوقت
-    function showTimeoutMessage() {
-        // حذف أي إشعارات سابقة
-        const existingAlerts = document.querySelectorAll('.timeout-alert');
-        for (let alert of existingAlerts) {
-            document.body.removeChild(alert);
-        }
-        
-        // إنشاء إشعار جديد
-        const timeoutEl = document.createElement('div');
-        timeoutEl.className = 'timeout-alert';
-        timeoutEl.textContent = '⏰ انتهى الوقت!';
-        document.body.appendChild(timeoutEl);
-        
-        // إظهار الإشعار بتأثير مرئي
-        setTimeout(() => {
-            timeoutEl.classList.add('show');
-        }, 10);
-        
-        // إظهار إشعار في منطقة حالة اللعبة أيضًا
-        showStatus('انتهى الوقت! (+1 سترايك)', 'error');
-        
-        // إزالة الإشعار بعد 2 ثانية
-        setTimeout(() => {
-            timeoutEl.classList.remove('show');
-            setTimeout(() => {
-                document.body.removeChild(timeoutEl);
-            }, 300);
-        }, 2000);
     }
     
     // التحقق من انتهاء الجولة
@@ -352,16 +362,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // إيقاف المؤقت
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
+        // إيقاف المؤقت المحلي
+        if (localTimerInterval) {
+            clearInterval(localTimerInterval);
+            localTimerInterval = null;
         }
         
         // إيقاف المؤقت في Firebase
-        timerRef.update({
-            active: false,
-            expired: false
+        roomRef.child('gameState').update({
+            timerActive: false,
+            timerExpired: false
         });
         
         // التحقق من الإجابة
@@ -502,10 +512,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const nextPlayer = currentTurnPlayer === 'player1' ? 'player2' : 'player1';
             data.gameState.currentTurn = nextPlayer;
             
-            // إعادة تعيين المؤقت
-            if (!data.gameState.timer) data.gameState.timer = {};
-            data.gameState.timer.active = false;
-            
             return data;
         }).then(() => {
             // التحقق من انتهاء الجولة بعد إجراء التحديث
@@ -515,16 +521,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // معالجة سكيب السؤال
     skipButton.addEventListener('click', function() {
-        // إيقاف المؤقت
-        if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
+        // إيقاف المؤقت المحلي
+        if (localTimerInterval) {
+            clearInterval(localTimerInterval);
+            localTimerInterval = null;
         }
         
         // إيقاف المؤقت في Firebase
-        timerRef.update({
-            active: false,
-            expired: false
+        roomRef.child('gameState').update({
+            timerActive: false,
+            timerExpired: false
         });
         
         // تعليم السكيب كمستخدم للسؤال الحالي
