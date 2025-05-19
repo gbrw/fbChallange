@@ -1,0 +1,407 @@
+/* تنسيقات أساسية */
+:root {
+    --primary-color: #22A699;
+    --secondary-color: #F2BE22;
+    --danger-color: #F24C4C;
+    --success-color: #3CCF4E;
+    --background-color: #f5f5f5;
+    --text-color: #333;
+    --border-radius: 8px;
+    --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    --transition: all 0.3s ease;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Tajawal', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    direction: rtl;
+}
+
+.container {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+h1 {
+    color: var(--primary-color);
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+h2 {
+    margin-bottom: 15px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* الأزرار */
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    transition: var(--transition);
+    margin: 10px 5px;
+}
+
+.btn:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+}
+
+.btn.primary {
+    background-color: var(--primary-color);
+}
+
+.btn.secondary {
+    background-color: var(--secondary-color);
+}
+
+.btn.danger {
+    background-color: var(--danger-color);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.buttons-container {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+/* النماذج */
+.form-container {
+    background-color: white;
+    padding: 30px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: var(--border-radius);
+    font-size: 16px;
+}
+
+/* الصفحة الرئيسية */
+.home-screen {
+    text-align: center;
+}
+
+.tagline {
+    font-size: 18px;
+    margin-bottom: 30px;
+    color: #666;
+}
+
+.game-instructions {
+    max-width: 600px;
+    margin: 30px auto;
+    text-align: right;
+    background-color: white;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+}
+
+.game-instructions ul {
+    margin-right: 20px;
+    margin-top: 10px;
+}
+
+/* غرفة الانتظار */
+.waiting-room-screen {
+    text-align: center;
+}
+
+.room-info {
+    background-color: white;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+}
+
+.room-code-display {
+    font-size: 32px;
+    font-weight: bold;
+    color: var(--primary-color);
+    margin: 10px 0;
+    letter-spacing: 5px;
+    background-color: #f0f9f8;
+    padding: 10px;
+    border-radius: var(--border-radius);
+    display: inline-block;
+}
+
+.waiting-animation {
+    margin: 30px 0;
+}
+
+.loader {
+    width: 50px;
+    height: 50px;
+    border: 5px solid rgba(34, 166, 153, 0.2);
+    border-top: 5px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 20px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.players-list {
+    background-color: white;
+    padding: 20px;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    max-width: 400px;
+    margin: 0 auto 20px;
+}
+
+.players-list ul {
+    list-style: none;
+}
+
+.players-list li {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.status.ready {
+    color: var(--success-color);
+}
+
+.status.waiting {
+    color: var(--secondary-color);
+}
+
+/* صفحة اللعبة */
+.game-screen {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.player-info {
+    text-align: center;
+    padding: 10px;
+    border-radius: var(--border-radius);
+    min-width: 100px;
+}
+
+.player-info.active {
+    background-color: rgba(34, 166, 153, 0.1);
+    border: 2px solid var(--primary-color);
+}
+
+.player-name {
+    font-weight: bold;
+}
+
+.player-score {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.player-strikes {
+    color: var(--danger-color);
+    font-size: 20px;
+    margin-top: 5px;
+}
+
+.game-info {
+    text-align: center;
+}
+
+.question-container {
+    text-align: center;
+    margin: 30px 0;
+}
+
+.question {
+    font-size: 24px;
+    margin-bottom: 20px;
+    background-color: rgba(34, 166, 153, 0.1);
+    padding: 15px;
+    border-radius: var(--border-radius);
+}
+
+.answer-container {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.answer-container input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid #ccc;
+    border-radius: var(--border-radius);
+    margin-bottom: 15px;
+}
+
+.timer {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: bold;
+    margin: 20px auto;
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+/* واجهة المشرف */
+.admin-screen {
+    background-color: white;
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow);
+    padding: 20px;
+}
+
+.admin-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.question-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.questions-list {
+    margin-top: 30px;
+}
+
+.question-item {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: var(--border-radius);
+    margin-bottom: 10px;
+}
+
+.question-actions {
+    margin-top: 10px;
+    text-align: left;
+}
+
+/* تنبيهات الحالة */
+.status-message {
+    padding: 10px 15px;
+    border-radius: var(--border-radius);
+    margin: 10px 0;
+}
+
+.status-message.success {
+    background-color: rgba(60, 207, 78, 0.1);
+    border-right: 3px solid var(--success-color);
+    color: var(--success-color);
+}
+
+.status-message.error {
+    background-color: rgba(242, 76, 76, 0.1);
+    border-right: 3px solid var(--danger-color);
+    color: var(--danger-color);
+}
+
+.status-message.info {
+    background-color: rgba(34, 166, 153, 0.1);
+    border-right: 3px solid var(--primary-color);
+    color: var(--primary-color);
+}
+
+.back-link {
+    display: inline-block;
+    margin-top: 20px;
+    color: var(--primary-color);
+    text-decoration: none;
+}
+
+.back-link:hover {
+    text-decoration: underline;
+}
+
+/* تحسينات للموبايل */
+@media (max-width: 768px) {
+    .game-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .player-info {
+        width: 100%;
+    }
+}
