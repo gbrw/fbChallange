@@ -1,4 +1,4 @@
-// منطق اللعبة الرئيسي (النسخة المصححة)
+// منطق اللعبة الرئيسي (النسخة المحسنة)
 
 document.addEventListener('DOMContentLoaded', function() {
     // التأكد من وجود معلومات اللاعب
@@ -84,6 +84,13 @@ document.addEventListener('DOMContentLoaded', function() {
             currentQuestion = gameState.currentQuestion;
             questionNumberElement.textContent = currentQuestion + 1;
             
+            // التحقق من انتهاء الأسئلة
+            if (currentQuestion >= 5) {
+                // انتهاء الجولة، الانتقال إلى صفحة النتائج
+                window.location.href = 'results.html?room=' + roomCode;
+                return;
+            }
+            
             // عرض السؤال الحالي
             if (gameQuestions[currentQuestion]) {
                 questionElement.textContent = gameQuestions[currentQuestion].question;
@@ -147,12 +154,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // معالجة انتهاء الوقت
     function handleTimeout() {
-        if (playerId !== roomRef.child('gameState/currentTurn').key) return;
-        
-        showStatus('انتهى الوقت!', 'error');
-        
-        // إضافة سترايك
-        addStrike();
+        // التأكد من أن هذا دور اللاعب الحالي
+        roomRef.child('gameState/currentTurn').once('value', snapshot => {
+            const currentTurn = snapshot.val();
+            if (currentTurn !== playerId) return;
+            
+            showStatus('انتهى الوقت!', 'error');
+            
+            // إضافة سترايك عند انتهاء الوقت
+            addStrike();
+        });
     }
     
     // إضافة سترايك
@@ -180,7 +191,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
                 
                 // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % 5;
+                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1);
+                
+                // التحقق من انتهاء الأسئلة (5 أسئلة)
+                if (data.gameState.currentQuestion >= 5) {
+                    // تعليم الجولة كمنتهية
+                    data.gameState.roundCompleted = true;
+                }
                 
                 // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
                 data.gameState.usedAnswers = {};
@@ -190,6 +207,20 @@ document.addEventListener('DOMContentLoaded', function() {
             data.gameState.currentTurn = opponentId;
             
             return data;
+        }).then(() => {
+            // التحقق من انتهاء الجولة بعد إجراء التحديث
+            checkRoundCompletion();
+        });
+    }
+    
+    // التحقق من انتهاء الجولة
+    function checkRoundCompletion() {
+        roomRef.child('gameState/roundCompleted').once('value', snapshot => {
+            const isCompleted = snapshot.val();
+            if (isCompleted) {
+                // الانتقال إلى صفحة النتائج
+                window.location.href = 'results.html?room=' + roomCode;
+            }
         });
     }
     
@@ -274,15 +305,24 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
                             
                             // الانتقال إلى السؤال التالي
-                            data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % 5;
+                            data.gameState.currentQuestion = (data.gameState.currentQuestion + 1);
+                            
+                            // التحقق من انتهاء الأسئلة (5 أسئلة)
+                            if (data.gameState.currentQuestion >= 5) {
+                                // تعليم الجولة كمنتهية
+                                data.gameState.roundCompleted = true;
+                            }
                             
                             // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
                             data.gameState.usedAnswers = {};
                             
-                            // إعادة تعيين الدور (يمكن تناوب اللاعبين للسؤال التالي)
+                            // إعادة تعيين الدور
                             data.gameState.currentTurn = opponentId;
                             
                             return data;
+                        }).then(() => {
+                            // التحقق من انتهاء الجولة بعد إجراء التحديث
+                            checkRoundCompletion();
                         });
                         
                         showStatus('تم استخدام جميع الإجابات! كلا اللاعبين يحصلان على نقطة', 'success');
