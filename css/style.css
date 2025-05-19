@@ -312,6 +312,28 @@ h2 {
     font-weight: bold;
     margin: 20px auto;
 }
+/* تنسيق إشعار انتهاء الوقت */
+.timeout-alert {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.5);
+    background-color: rgba(242, 76, 76, 0.9);
+    color: white;
+    padding: 20px 40px;
+    border-radius: 10px;
+    font-size: 28px;
+    font-weight: bold;
+    z-index: 1000;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    transition: all 0.3s ease;
+}
+
+.timeout-alert.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
 
 .controls {
     display: flex;
