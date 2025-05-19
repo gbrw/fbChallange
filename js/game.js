@@ -1,4 +1,4 @@
-// منطق اللعبة الرئيسي
+// منطق اللعبة الرئيسي (النسخة المصححة)
 
 document.addEventListener('DOMContentLoaded', function() {
     // التأكد من وجود معلومات اللاعب
@@ -98,7 +98,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const isPlayerTurn = currentTurn === playerId;
         answerInput.disabled = !isPlayerTurn;
         submitButton.disabled = !isPlayerTurn;
-        skipButton.disabled = !isPlayerTurn || (roomData.players[playerId]?.skipUsed);
+        
+        // تحديث زر السكيب (يمكن استخدامه مرة واحدة لكل سؤال)
+        const skipUsed = roomData.gameState?.skipUsed?.[playerId]?.[currentQuestion] || false;
+        skipButton.disabled = !isPlayerTurn || skipUsed;
         
         // إذا تغير الدور للاعب الحالي، ابدأ المؤقت
         if (isPlayerTurn && timer.remaining === timer.duration) {
@@ -162,13 +165,25 @@ document.addEventListener('DOMContentLoaded', function() {
             // تحديث عدد السترايكات
             data.players[playerId].strikes = strikes;
             
-            // إذا وصل عدد السترايكات إلى 3، أضف نقطة للخصم وأعد تعيين السترايكات
+            // إذا وصل عدد السترايكات إلى 3
             if (strikes >= 3) {
+                // أضف نقطة للخصم
                 data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
+                
+                // أعد تعيين السترايكات
                 data.players[playerId].strikes = 0;
+                data.players[opponentId].strikes = 0;
+                
+                // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
+                if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
+                if (!data.gameState.skipUsed.player1) data.gameState.skipUsed.player1 = {};
+                if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
                 
                 // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % gameQuestions.length;
+                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % 5;
+                
+                // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
+                data.gameState.usedAnswers = {};
             }
             
             // تغيير الدور
@@ -214,28 +229,68 @@ document.addEventListener('DOMContentLoaded', function() {
         const correctAnswers = questionData.answers.map(a => a.toLowerCase());
         
         // التحقق من صحة الإجابة
-        const isCorrect = correctAnswers.some(a => cleanAnswer.includes(a) || a.includes(cleanAnswer));
+        const isCorrect = correctAnswers.some(a => {
+            const isMatch = cleanAnswer.includes(a) || a.includes(cleanAnswer);
+            return isMatch;
+        });
         
         if (isCorrect) {
-            showStatus('إجابة صحيحة! 🎉', 'success');
-            
-            // تحديث النتيجة وانتقال للسؤال التالي
-            roomRef.transaction(data => {
-                if (data === null) return data;
+            // التحقق مما إذا كانت الإجابة مستخدمة مسبقًا
+            roomRef.child(`gameState/usedAnswers/${cleanAnswer}`).once('value', snapshot => {
+                const isUsed = snapshot.exists() && snapshot.val() === true;
                 
-                // إضافة نقطة للاعب الحالي
-                data.players[playerId].score = (data.players[playerId]?.score || 0) + 1;
+                if (isUsed) {
+                    showStatus('هذه الإجابة مستخدمة بالفعل، جرب إجابة أخرى', 'error');
+                    // إضافة سترايك لاستخدام إجابة مستخدمة
+                    addStrike();
+                    return;
+                }
                 
-                // إعادة تعيين السترايكات
-                data.players[playerId].strikes = 0;
+                showStatus('إجابة صحيحة! 🎉', 'success');
                 
-                // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % gameQuestions.length;
+                // تعليم الإجابة كمستخدمة
+                roomRef.child(`gameState/usedAnswers/${cleanAnswer}`).set(true);
                 
-                // تغيير الدور
-                data.gameState.currentTurn = opponentId;
-                
-                return data;
+                // التحقق من استخدام جميع الإجابات
+                roomRef.child('gameState/usedAnswers').once('value', answersSnapshot => {
+                    const usedAnswersCount = answersSnapshot.numChildren();
+                    
+                    if (usedAnswersCount >= correctAnswers.length) {
+                        // تم استخدام جميع الإجابات، كلا اللاعبين يحصلان على نقطة
+                        roomRef.transaction(data => {
+                            if (data === null) return data;
+                            
+                            // إضافة نقطة لكلا اللاعبين
+                            data.players.player1.score = (data.players.player1?.score || 0) + 1;
+                            data.players.player2.score = (data.players.player2?.score || 0) + 1;
+                            
+                            // إعادة تعيين السترايكات
+                            data.players.player1.strikes = 0;
+                            data.players.player2.strikes = 0;
+                            
+                            // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
+                            if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
+                            if (!data.gameState.skipUsed.player1) data.gameState.skipUsed.player1 = {};
+                            if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
+                            
+                            // الانتقال إلى السؤال التالي
+                            data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % 5;
+                            
+                            // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
+                            data.gameState.usedAnswers = {};
+                            
+                            // إعادة تعيين الدور (يمكن تناوب اللاعبين للسؤال التالي)
+                            data.gameState.currentTurn = opponentId;
+                            
+                            return data;
+                        });
+                        
+                        showStatus('تم استخدام جميع الإجابات! كلا اللاعبين يحصلان على نقطة', 'success');
+                    } else {
+                        // تغيير الدور فقط
+                        roomRef.child('gameState/currentTurn').set(opponentId);
+                    }
+                });
             });
         } else {
             showStatus('إجابة خاطئة', 'error');
@@ -247,36 +302,27 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // معالجة سكيب السؤال
     skipButton.addEventListener('click', function() {
-        // التأكد من أن اللاعب لم يستخدم سكيب من قبل
-        roomRef.child(`players/${playerId}/skipUsed`).once('value', snapshot => {
-            const skipUsed = snapshot.val();
+        // إيقاف المؤقت
+        timer.stop();
+        
+        // تعليم السكيب كمستخدم للسؤال الحالي
+        roomRef.transaction(data => {
+            if (data === null) return data;
             
-            if (skipUsed) {
-                showStatus('لقد استخدمت السكيب بالفعل', 'error');
-                return;
-            }
+            // إنشاء الهيكل إذا لم يكن موجودًا
+            if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
+            if (!data.gameState.skipUsed[playerId]) data.gameState.skipUsed[playerId] = {};
             
-            // إيقاف المؤقت
-            timer.stop();
+            // تعليم السكيب كمستخدم للسؤال الحالي
+            data.gameState.skipUsed[playerId][data.gameState.currentQuestion] = true;
             
-            // تفعيل استخدام السكيب وتغيير الدور
-            roomRef.transaction(data => {
-                if (data === null) return data;
-                
-                // تعليم السكيب كمستخدم
-                data.players[playerId].skipUsed = true;
-                
-                // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1) % gameQuestions.length;
-                
-                // تغيير الدور
-                data.gameState.currentTurn = opponentId;
-                
-                return data;
-            });
+            // تغيير الدور
+            data.gameState.currentTurn = opponentId;
             
-            showStatus('تم استخدام السكيب', 'info');
+            return data;
         });
+        
+        showStatus('تم استخدام السكيب', 'info');
     });
     
     // معالجة الضغط على Enter في حقل الإجابة
