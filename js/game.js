@@ -112,74 +112,76 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        // التحقق من حالة المؤقت
-        if (gameState.timerEndTime) {
-            updateTimerDisplay(gameState.timerEndTime, gameState.timerActive);
-            
-            // إذا تم تحديد أن الوقت انتهى، أظهر رسالة
-            if (gameState.timerExpired && !document.querySelector('.timeout-alert')) {
-                // ربما تم إضافة السترايك بالفعل، فقط أظهر الرسالة
-                showTimeoutAlert();
-            }
-        }
-    });
+        // تحديث المؤقت
+if (gameState.timerEndTime) {
+    updateTimerDisplay(gameState.timerEndTime, gameState.timerActive, gameState.currentTurn);
     
-    // تحديث المؤقت على الشاشة
+    // إذا تم تحديد أن الوقت انتهى، أظهر رسالة
+    if (gameState.timerExpired && !document.querySelector('.timeout-alert')) {
+        showTimeoutAlert();
+    }
+}
+    
+    // تحديث المؤقت على الشاشة - حل شامل
 function updateTimerDisplay(endTime, isActive, currentTurn) {
-    // إلغاء المؤقت الحالي إن وجد
+    // إيقاف أي مؤقت سابق
     if (localTimerInterval) {
         clearInterval(localTimerInterval);
         localTimerInterval = null;
     }
     
+    // إذا تم إيقاف المؤقت من Firebase
     if (!isActive) {
         timerElement.textContent = "0";
         timerElement.style.backgroundColor = '#F24C4C';
         return;
     }
     
-    // حساب الوقت المتبقي بناءً على الوقت الحالي
-    const now = Date.now() + serverTimeOffset;
-    let timeLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
+    // حساب الوقت المتبقي بشكل مباشر
+    const timeNow = Date.now();
+    let secondsLeft = Math.max(0, Math.ceil((endTime - timeNow) / 1000));
     
-    // تحديث عرض المؤقت
-    timerElement.textContent = timeLeft;
+    // تحديث عرض المؤقت فوراً
+    timerElement.textContent = secondsLeft;
     
-    // تعيين لون المؤقت
-    if (timeLeft <= 3) {
+    // تغيير لون المؤقت
+    if (secondsLeft <= 3) {
         timerElement.style.backgroundColor = '#F24C4C';
     } else {
         timerElement.style.backgroundColor = '#22A699';
     }
     
+    console.log(`المؤقت نشط: ${secondsLeft} ثانية متبقية`);
+    
     // بدء مؤقت محلي للعد التنازلي لجميع اللاعبين
-    if (isActive && timeLeft > 0) {
-        localTimerInterval = setInterval(function() {
-            const currentTime = Date.now() + serverTimeOffset;
-            timeLeft = Math.max(0, Math.ceil((endTime - currentTime) / 1000));
+    localTimerInterval = setInterval(function() {
+        // حساب الوقت المتبقي في كل تحديث
+        const now = Date.now();
+        secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
+        
+        // تحديث المؤقت على الشاشة
+        timerElement.textContent = secondsLeft;
+        
+        // تحديث لون المؤقت
+        if (secondsLeft <= 3) {
+            timerElement.style.backgroundColor = '#F24C4C';
+        } else {
+            timerElement.style.backgroundColor = '#22A699';
+        }
+        
+        // إذا انتهى الوقت
+        if (secondsLeft === 0) {
+            console.log("انتهى الوقت!");
+            clearInterval(localTimerInterval);
+            localTimerInterval = null;
             
-            // تحديث عرض المؤقت
-            timerElement.textContent = timeLeft;
-            
-            // تغيير لون المؤقت
-            if (timeLeft <= 3) {
-                timerElement.style.backgroundColor = '#F24C4C';
+            // التحقق من أنه لا يزال دور اللاعب الحالي
+            if (currentTurn === playerId) {
+                console.log("دورك! جاري معالجة انتهاء الوقت...");
+                handleTimeout();
             }
-            
-            // إذا انتهى الوقت
-            if (timeLeft === 0) {
-                clearInterval(localTimerInterval);
-                localTimerInterval = null;
-                
-                // فقط اللاعب الذي هو دوره يقوم بمعالجة انتهاء الوقت
-                roomRef.child('gameState/currentTurn').once('value', function(snapshot) {
-                    if (snapshot.val() === playerId) {
-                        handleTimeout();
-                    }
-                });
-            }
-        }, 500);
-    }
+        }
+    }, 200); // تحديث أسرع للحصول على عد أكثر سلاسة
 }
     
     // بدء دور جديد
