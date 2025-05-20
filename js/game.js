@@ -1,4 +1,4 @@
-// منطق اللعبة الرئيسي - الإصدار النهائي المصحح
+// منطق اللعبة الرئيسي - الإصدار النهائي الشامل
 
 document.addEventListener('DOMContentLoaded', function() {
     // التأكد من وجود معلومات اللاعب
@@ -37,15 +37,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // مؤقت محلي لعرض العد التنازلي
     let localTimerInterval = null;
-    let serverTimeOffset = 0;
     
-    // مرجع الغرفة
+    // مراجع Firebase
     const roomRef = database.ref('rooms/' + roomCode);
     
-    // الحصول على فرق الوقت بين السيرفر والعميل
-    database.ref(".info/serverTimeOffset").on('value', function(snap) {
-        serverTimeOffset = snap.val() || 0;
-    });
+    // التحقق من معلومات اللاعب
+    function checkPlayerInfo() {
+        const requiredFields = ['roomCode', 'playerName', 'playerId'];
+        for (const field of requiredFields) {
+            if (!localStorage.getItem(field)) {
+                window.location.href = 'index.html';
+                return false;
+            }
+        }
+        return true;
+    }
     
     // الاستماع للتغييرات في الغرفة
     roomRef.on('value', function(snapshot) {
@@ -208,7 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // وظيفة جديدة لبدء دور اللاعب التالي
+    // وظيفة لبدء دور اللاعب التالي
     function startNewTurnForNextPlayer() {
         // التحقق من الدور الحالي
         roomRef.child('gameState/currentTurn').once('value', function(snapshot) {
@@ -397,7 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     }
     
-    // إضافة سترايك
+    // إضافة سترايك (عند الإجابة الخاطئة)
     function addStrike() {
         roomRef.transaction(data => {
             if (data === null) return data;
@@ -567,18 +573,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         showStatus('تم استخدام جميع الإجابات! كلا اللاعبين يحصلان على نقطة', 'success');
                     } else {
                         // تغيير الدور فقط
-                        roomRef.transaction(data => {
-                            if (data === null) return data;
-                            
-                            // تغيير الدور
-                            data.gameState.currentTurn = opponentId;
-                            
-                            // إعادة تعيين المؤقت
-                            data.gameState.timerActive = false;
-                            data.gameState.timerExpired = false;
-                            data.gameState.timerEndTime = 0;
-                            
-                            return data;
+                        roomRef.child('gameState').update({
+                            currentTurn: opponentId,
+                            timerActive: false,
+                            timerExpired: false,
+                            timerEndTime: 0
                         }).then(() => {
                             // بدء دور جديد للاعب التالي
                             startNewTurnForNextPlayer();
@@ -605,7 +604,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // إيقاف المؤقت في Firebase
         roomRef.child('gameState').update({
             timerActive: false,
-            timerExpired: false
+            timerExpired: false,
+            timerEndTime: 0
         });
         
         // تعليم السكيب كمستخدم للسؤال الحالي
@@ -643,14 +643,4 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.click();
         }
     });
-    
-    // التحقق من وجود معلومات اللاعب
-    function checkPlayerInfo() {
-        if (!localStorage.getItem('playerName') || !localStorage.getItem('playerId') || !localStorage.getItem('roomCode')) {
-            alert('معلومات اللاعب غير موجودة. سيتم توجيهك إلى الصفحة الرئيسية.');
-            window.location.href = 'index.html';
-            return false;
-        }
-        return true;
-    }
 });
