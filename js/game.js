@@ -125,62 +125,62 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // تحديث المؤقت على الشاشة
-    function updateTimerDisplay(endTime, isActive) {
-        // إلغاء المؤقت الحالي إن وجد
-        if (localTimerInterval) {
-            clearInterval(localTimerInterval);
-            localTimerInterval = null;
-        }
-        
-        if (!isActive) {
-            timerElement.textContent = "0";
-            timerElement.style.backgroundColor = '#F24C4C';
-            return;
-        }
-        
-        // حساب الوقت المتبقي بناءً على الوقت الحالي
-        const now = Date.now() + serverTimeOffset;
-        let timeLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
-        
-        // تحديث عرض المؤقت
-        timerElement.textContent = timeLeft;
-        
-        // تعيين لون المؤقت
-        if (timeLeft <= 3) {
-            timerElement.style.backgroundColor = '#F24C4C';
-        } else {
-            timerElement.style.backgroundColor = '#22A699';
-        }
-        
-        // بدء مؤقت محلي للعد التنازلي
-        if (isActive && timeLeft > 0) {
-            localTimerInterval = setInterval(function() {
-                const currentTime = Date.now() + serverTimeOffset;
-                timeLeft = Math.max(0, Math.ceil((endTime - currentTime) / 1000));
-                
-                // تحديث عرض المؤقت
-                timerElement.textContent = timeLeft;
-                
-                // تغيير لون المؤقت
-                if (timeLeft <= 3) {
-                    timerElement.style.backgroundColor = '#F24C4C';
-                }
-                
-                // إذا انتهى الوقت
-                if (timeLeft === 0) {
-                    clearInterval(localTimerInterval);
-                    localTimerInterval = null;
-                    
-                    // فقط اللاعب الذي هو دوره يقوم بمعالجة انتهاء الوقت
-                    roomRef.child('gameState/currentTurn').once('value', function(turnSnap) {
-                        if (turnSnap.val() === playerId) {
-                            handleTimeout();
-                        }
-                    });
-                }
-            }, 500);
-        }
+function updateTimerDisplay(endTime, isActive, currentTurn) {
+    // إلغاء المؤقت الحالي إن وجد
+    if (localTimerInterval) {
+        clearInterval(localTimerInterval);
+        localTimerInterval = null;
     }
+    
+    // عرض الوقت المتبقي لجميع اللاعبين
+    if (!isActive) {
+        timerElement.textContent = "0";
+        timerElement.style.backgroundColor = '#F24C4C';
+        return;
+    }
+    
+    // حساب الوقت المتبقي بناءً على الوقت الحالي
+    const now = Date.now() + serverTimeOffset;
+    let timeLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
+    
+    // تحديث عرض المؤقت
+    timerElement.textContent = timeLeft;
+    
+    // تعيين لون المؤقت
+    if (timeLeft <= 3) {
+        timerElement.style.backgroundColor = '#F24C4C';
+    } else {
+        timerElement.style.backgroundColor = '#22A699';
+    }
+    
+    // تشغيل المؤقت فقط للاعب الذي حان دوره
+    const isPlayerTurn = currentTurn === playerId;
+    
+    // بدء مؤقت محلي للعد التنازلي فقط إذا كان دور اللاعب الحالي
+    if (isActive && timeLeft > 0 && isPlayerTurn) {
+        localTimerInterval = setInterval(function() {
+            const currentTime = Date.now() + serverTimeOffset;
+            timeLeft = Math.max(0, Math.ceil((endTime - currentTime) / 1000));
+            
+            // تحديث عرض المؤقت
+            timerElement.textContent = timeLeft;
+            
+            // تغيير لون المؤقت
+            if (timeLeft <= 3) {
+                timerElement.style.backgroundColor = '#F24C4C';
+            }
+            
+            // إذا انتهى الوقت
+            if (timeLeft === 0) {
+                clearInterval(localTimerInterval);
+                localTimerInterval = null;
+                
+                // فقط اللاعب الذي هو دوره يقوم بمعالجة انتهاء الوقت
+                handleTimeout();
+            }
+        }, 500);
+    }
+}
     
     // بدء دور جديد
     function startNewTurn() {
