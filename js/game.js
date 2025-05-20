@@ -1,4 +1,4 @@
-// منطق اللعبة الرئيسي - النسخة النهائية
+// منطق اللعبة الرئيسي - الإصدار النهائي المصحح
 
 document.addEventListener('DOMContentLoaded', function() {
     // التأكد من وجود معلومات اللاعب
@@ -13,7 +13,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentQuestion = 0;
     let gameQuestions = [];
     let opponentId = playerId === 'player1' ? 'player2' : 'player1';
-    let lastKnownTurn = '';
     
     // مراجع العناصر
     const timerElement = document.getElementById('timer');
@@ -40,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let localTimerInterval = null;
     let serverTimeOffset = 0;
     
-    // مراجع Firebase
+    // مرجع الغرفة
     const roomRef = database.ref('rooms/' + roomCode);
     
     // الحصول على فرق الوقت بين السيرفر والعميل
@@ -100,89 +99,95 @@ document.addEventListener('DOMContentLoaded', function() {
         const skipUsed = roomData.gameState?.skipUsed?.[playerId]?.[currentQuestion] || false;
         skipButton.disabled = !isPlayerTurn || skipUsed;
         
-        // التغيير في الدور: إذا تغير الدور عن آخر مرة
-        if (lastKnownTurn !== currentTurn) {
-            console.log(`تغير الدور من ${lastKnownTurn} إلى ${currentTurn}`);
-            lastKnownTurn = currentTurn;
-            
-            // إذا كان الدور دور اللاعب الحالي، ابدأ مؤقت جديد
-            if (isPlayerTurn) {
-                // بدء التايمر للاعب الجديد
-                startNewTurn();
-            }
+        // التحقق إذا كان لا يوجد مؤقت نشط وهو دور اللاعب الحالي
+        if (isPlayerTurn && !gameState.timerActive && !gameState.timerExpired) {
+            console.log('تحول الدور: بدء مؤقت جديد للاعب ' + playerId);
+            startNewTurn();
         }
         
-        // تحديث المؤقت
-if (gameState.timerEndTime) {
-    updateTimerDisplay(gameState.timerEndTime, gameState.timerActive, gameState.currentTurn);
-    
-    // إذا تم تحديد أن الوقت انتهى، أظهر رسالة
-    if (gameState.timerExpired && !document.querySelector('.timeout-alert')) {
-        showTimeoutAlert();
-    }
-}
-    
-    // تحديث المؤقت على الشاشة - حل شامل
-function updateTimerDisplay(endTime, isActive, currentTurn) {
-    // إيقاف أي مؤقت سابق
-    if (localTimerInterval) {
-        clearInterval(localTimerInterval);
-        localTimerInterval = null;
-    }
-    
-    // إذا تم إيقاف المؤقت من Firebase
-    if (!isActive) {
-        timerElement.textContent = "0";
-        timerElement.style.backgroundColor = '#F24C4C';
-        return;
-    }
-    
-    // حساب الوقت المتبقي بشكل مباشر
-    const timeNow = Date.now();
-    let secondsLeft = Math.max(0, Math.ceil((endTime - timeNow) / 1000));
-    
-    // تحديث عرض المؤقت فوراً
-    timerElement.textContent = secondsLeft;
-    
-    // تغيير لون المؤقت
-    if (secondsLeft <= 3) {
-        timerElement.style.backgroundColor = '#F24C4C';
-    } else {
-        timerElement.style.backgroundColor = '#22A699';
-    }
-    
-    console.log(`المؤقت نشط: ${secondsLeft} ثانية متبقية`);
-    
-    // بدء مؤقت محلي للعد التنازلي لجميع اللاعبين
-    localTimerInterval = setInterval(function() {
-        // حساب الوقت المتبقي في كل تحديث
-        const now = Date.now();
-        secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
+        // التحقق من حالة المؤقت
+        if (gameState.timerEndTime && gameState.timerActive) {
+            // عرض المؤقت بناءً على الحقول في gameState
+            updateTimerDisplay(gameState.timerEndTime, gameState.timerActive, gameState.currentTurn);
+        }
         
-        // تحديث المؤقت على الشاشة
+        // إذا تم تحديد أن الوقت انتهى، أظهر رسالة
+        if (gameState.timerExpired && !document.querySelector('.timeout-alert')) {
+            showTimeoutAlert();
+        }
+    });
+    
+    // تحديث المؤقت على الشاشة
+    function updateTimerDisplay(endTime, isActive, currentTurn) {
+        // إيقاف أي مؤقت سابق
+        if (localTimerInterval) {
+            clearInterval(localTimerInterval);
+            localTimerInterval = null;
+        }
+        
+        // إذا كانت اللعبة غير نشطة، أظهر صفر
+        if (!isActive) {
+            timerElement.textContent = "0";
+            timerElement.style.backgroundColor = '#F24C4C';
+            return;
+        }
+        
+        // التحقق من إظهار الدور الصحيح
+        updateTurnUI(currentTurn);
+        
+        // تحديث عناصر التحكم بناءً على الدور الحالي
+        const isPlayerTurn = currentTurn === playerId;
+        answerInput.disabled = !isPlayerTurn;
+        submitButton.disabled = !isPlayerTurn;
+        
+        // حساب الوقت المتبقي بشكل مباشر
+        const timeNow = Date.now();
+        let secondsLeft = Math.max(0, Math.ceil((endTime - timeNow) / 1000));
+        
+        // تحديث عرض المؤقت فوراً
         timerElement.textContent = secondsLeft;
         
-        // تحديث لون المؤقت
+        // تغيير لون المؤقت
         if (secondsLeft <= 3) {
             timerElement.style.backgroundColor = '#F24C4C';
         } else {
             timerElement.style.backgroundColor = '#22A699';
         }
         
-        // إذا انتهى الوقت
-        if (secondsLeft === 0) {
-            console.log("انتهى الوقت!");
-            clearInterval(localTimerInterval);
-            localTimerInterval = null;
+        console.log(`المؤقت نشط: ${secondsLeft} ثانية متبقية، الدور: ${currentTurn}`);
+        
+        // بدء مؤقت محلي للعد التنازلي لجميع اللاعبين
+        localTimerInterval = setInterval(function() {
+            // حساب الوقت المتبقي في كل تحديث
+            const now = Date.now();
+            secondsLeft = Math.max(0, Math.ceil((endTime - now) / 1000));
             
-            // التحقق من أنه لا يزال دور اللاعب الحالي
-            if (currentTurn === playerId) {
-                console.log("دورك! جاري معالجة انتهاء الوقت...");
-                handleTimeout();
+            // تحديث المؤقت على الشاشة
+            timerElement.textContent = secondsLeft;
+            
+            // تحديث لون المؤقت
+            if (secondsLeft <= 3) {
+                timerElement.style.backgroundColor = '#F24C4C';
+            } else {
+                timerElement.style.backgroundColor = '#22A699';
             }
-        }
-    }, 200); // تحديث أسرع للحصول على عد أكثر سلاسة
-}
+            
+            // إذا انتهى الوقت
+            if (secondsLeft === 0) {
+                console.log("انتهى الوقت!");
+                clearInterval(localTimerInterval);
+                localTimerInterval = null;
+                
+                // التحقق من أنه لا يزال دور اللاعب الحالي
+                roomRef.child('gameState/currentTurn').once('value', function(turnSnap) {
+                    if (turnSnap.val() === playerId) {
+                        console.log("دورك! جاري معالجة انتهاء الوقت...");
+                        handleTimeout();
+                    }
+                });
+            }
+        }, 200); // تحديث أسرع للحصول على عد أكثر سلاسة
+    }
     
     // بدء دور جديد
     function startNewTurn() {
@@ -192,7 +197,7 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
         answerInput.focus();
         
         // وقت انتهاء المؤقت = الوقت الحالي + 8 ثوانٍ
-        const now = Date.now() + serverTimeOffset;
+        const now = Date.now();
         const timerEndTime = now + 8000;
         
         // تحديث بيانات المؤقت في Firebase
@@ -200,6 +205,31 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
             timerEndTime: timerEndTime,
             timerActive: true,
             timerExpired: false
+        });
+    }
+    
+    // وظيفة جديدة لبدء دور اللاعب التالي
+    function startNewTurnForNextPlayer() {
+        // التحقق من الدور الحالي
+        roomRef.child('gameState/currentTurn').once('value', function(snapshot) {
+            const currentTurn = snapshot.val();
+            console.log(`الدور الحالي: ${currentTurn}`);
+            
+            // فقط اللاعب الذي حان دوره يقوم بتحديث المؤقت
+            if (currentTurn === playerId) {
+                console.log('بدء دور جديد للاعب: ' + playerId);
+                
+                // وقت انتهاء المؤقت = الوقت الحالي + 8 ثوانٍ
+                const now = Date.now();
+                const timerEndTime = now + 8000;
+                
+                // تحديث بيانات المؤقت في Firebase
+                roomRef.child('gameState').update({
+                    timerEndTime: timerEndTime,
+                    timerActive: true,
+                    timerExpired: false
+                });
+            }
         });
     }
     
@@ -217,65 +247,68 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
             // إظهار رسالة انتهاء الوقت
             showTimeoutAlert();
             
-            // إضافة سترايك
-            addStrikeOnTimeout();
-        });
-    }
-    
-    // إضافة سترايك عند انتهاء الوقت
-    function addStrikeOnTimeout() {
-        roomRef.transaction(function(data) {
-            if (!data) return data;
-            
-            // الحصول على معرف اللاعب الذي انتهى وقته
-            const turnPlayerId = data.gameState.currentTurn;
-            console.log(`إضافة سترايك للاعب الحالي: ${turnPlayerId}`);
-            
-            // زيادة عدد السترايكات
-            const strikes = (data.players[turnPlayerId]?.strikes || 0) + 1;
-            data.players[turnPlayerId].strikes = strikes;
-            
-            console.log(`عدد السترايكات الجديد: ${strikes}`);
-            
-            // إذا وصل عدد السترايكات إلى 3
-            if (strikes >= 3) {
-                console.log('وصل عدد السترايكات إلى 3، إضافة نقطة للخصم');
+            // إضافة سترايك وتغيير الدور
+            roomRef.transaction(function(data) {
+                if (!data) return data;
                 
-                // تحديد اللاعب الخصم
-                const opponentId = turnPlayerId === 'player1' ? 'player2' : 'player1';
+                // الحصول على معرف اللاعب الذي انتهى وقته
+                const turnPlayerId = data.gameState.currentTurn;
+                console.log(`إضافة سترايك للاعب الحالي: ${turnPlayerId}`);
                 
-                // إضافة نقطة للخصم
-                data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
+                // زيادة عدد السترايكات
+                const strikes = (data.players[turnPlayerId]?.strikes || 0) + 1;
+                data.players[turnPlayerId].strikes = strikes;
                 
-                // إعادة تعيين السترايكات لكلا اللاعبين
-                data.players.player1.strikes = 0;
-                data.players.player2.strikes = 0;
+                console.log(`عدد السترايكات الجديد: ${strikes}`);
                 
-                // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion += 1;
-                
-                // التحقق من انتهاء الأسئلة
-                if (data.gameState.currentQuestion >= 5) {
-                    data.gameState.roundCompleted = true;
+                // إذا وصل عدد السترايكات إلى 3
+                if (strikes >= 3) {
+                    console.log('وصل عدد السترايكات إلى 3، إضافة نقطة للخصم');
+                    
+                    // تحديد اللاعب الخصم
+                    const opponentId = turnPlayerId === 'player1' ? 'player2' : 'player1';
+                    
+                    // إضافة نقطة للخصم
+                    data.players[opponentId].score = (data.players[opponentId]?.score || 0) + 1;
+                    
+                    // إعادة تعيين السترايكات لكلا اللاعبين
+                    data.players.player1.strikes = 0;
+                    data.players.player2.strikes = 0;
+                    
+                    // الانتقال إلى السؤال التالي
+                    data.gameState.currentQuestion += 1;
+                    
+                    // التحقق من انتهاء الأسئلة
+                    if (data.gameState.currentQuestion >= 5) {
+                        data.gameState.roundCompleted = true;
+                    }
+                    
+                    // إعادة تعيين الإجابات المستخدمة
+                    data.gameState.usedAnswers = {};
+                    
+                    // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
+                    if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
                 }
                 
-                // إعادة تعيين الإجابات المستخدمة
-                data.gameState.usedAnswers = {};
+                // تغيير الدور بشكل صريح
+                const nextPlayer = turnPlayerId === 'player1' ? 'player2' : 'player1';
+                data.gameState.currentTurn = nextPlayer;
                 
-                // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
-                if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
-            }
-            
-            // تغيير الدور
-            const nextPlayer = turnPlayerId === 'player1' ? 'player2' : 'player1';
-            data.gameState.currentTurn = nextPlayer;
-            
-            return data;
-        }).then(function() {
-            console.log('تمت إضافة السترايك بنجاح');
-            
-            // التحقق من انتهاء الجولة
-            checkRoundCompletion();
+                // إعادة تعيين المؤقت (مهم!)
+                data.gameState.timerActive = false;
+                data.gameState.timerExpired = false;
+                data.gameState.timerEndTime = 0;
+                
+                return data;
+            }).then(function(result) {
+                console.log('تمت إضافة السترايك بنجاح');
+                
+                // التحقق من انتهاء الجولة
+                checkRoundCompletion();
+                
+                // بدء دور جديد للاعب التالي
+                startNewTurnForNextPlayer();
+            });
         });
     }
     
@@ -284,7 +317,9 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
         // حذف أي إشعارات سابقة
         const existingAlerts = document.querySelectorAll('.timeout-alert');
         existingAlerts.forEach(alert => {
-            document.body.removeChild(alert);
+            if (document.body.contains(alert)) {
+                document.body.removeChild(alert);
+            }
         });
         
         // إنشاء إشعار جديد
@@ -360,6 +395,67 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
         setTimeout(() => {
             gameStatus.classList.add('hidden');
         }, 3000);
+    }
+    
+    // إضافة سترايك
+    function addStrike() {
+        roomRef.transaction(data => {
+            if (data === null) return data;
+            
+            // التحقق من دور اللاعب الحالي
+            const currentTurnPlayer = data.gameState.currentTurn;
+            
+            const strikes = (data.players[currentTurnPlayer]?.strikes || 0) + 1;
+            console.log(`تحديث السترايك للاعب ${currentTurnPlayer}: ${strikes}`);
+            
+            // تحديث عدد السترايكات
+            data.players[currentTurnPlayer].strikes = strikes;
+            
+            // إذا وصل عدد السترايكات إلى 3
+            if (strikes >= 3) {
+                // أضف نقطة للخصم
+                const opponent = currentTurnPlayer === 'player1' ? 'player2' : 'player1';
+                data.players[opponent].score = (data.players[opponent]?.score || 0) + 1;
+                
+                // أعد تعيين السترايكات
+                data.players[currentTurnPlayer].strikes = 0;
+                data.players[opponent].strikes = 0;
+                
+                // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
+                if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
+                if (!data.gameState.skipUsed.player1) data.gameState.skipUsed.player1 = {};
+                if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
+                
+                // الانتقال إلى السؤال التالي
+                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1);
+                
+                // التحقق من انتهاء الأسئلة (5 أسئلة)
+                if (data.gameState.currentQuestion >= 5) {
+                    // تعليم الجولة كمنتهية
+                    data.gameState.roundCompleted = true;
+                }
+                
+                // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
+                data.gameState.usedAnswers = {};
+            }
+            
+            // تغيير الدور
+            const nextPlayer = currentTurnPlayer === 'player1' ? 'player2' : 'player1';
+            data.gameState.currentTurn = nextPlayer;
+            
+            // إعادة تعيين المؤقت
+            data.gameState.timerActive = false;
+            data.gameState.timerExpired = false;
+            data.gameState.timerEndTime = 0;
+            
+            return data;
+        }).then(() => {
+            // التحقق من انتهاء الجولة بعد إجراء التحديث
+            checkRoundCompletion();
+            
+            // بدء دور جديد للاعب التالي
+            startNewTurnForNextPlayer();
+        });
     }
     
     // معالجة تقديم الإجابة
@@ -454,16 +550,39 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
                             // إعادة تعيين الدور
                             data.gameState.currentTurn = opponentId;
                             
+                            // إعادة تعيين المؤقت
+                            data.gameState.timerActive = false;
+                            data.gameState.timerExpired = false;
+                            data.gameState.timerEndTime = 0;
+                            
                             return data;
                         }).then(() => {
                             // التحقق من انتهاء الجولة بعد إجراء التحديث
                             checkRoundCompletion();
+                            
+                            // بدء دور جديد للاعب التالي
+                            startNewTurnForNextPlayer();
                         });
                         
                         showStatus('تم استخدام جميع الإجابات! كلا اللاعبين يحصلان على نقطة', 'success');
                     } else {
                         // تغيير الدور فقط
-                        roomRef.child('gameState/currentTurn').set(opponentId);
+                        roomRef.transaction(data => {
+                            if (data === null) return data;
+                            
+                            // تغيير الدور
+                            data.gameState.currentTurn = opponentId;
+                            
+                            // إعادة تعيين المؤقت
+                            data.gameState.timerActive = false;
+                            data.gameState.timerExpired = false;
+                            data.gameState.timerEndTime = 0;
+                            
+                            return data;
+                        }).then(() => {
+                            // بدء دور جديد للاعب التالي
+                            startNewTurnForNextPlayer();
+                        });
                     }
                 });
             });
@@ -474,59 +593,6 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
             addStrike();
         }
     });
-    
-    // إضافة سترايك
-    function addStrike() {
-        roomRef.transaction(data => {
-            if (data === null) return data;
-            
-            // التحقق من دور اللاعب الحالي
-            const currentTurnPlayer = data.gameState.currentTurn;
-            
-            const strikes = (data.players[currentTurnPlayer]?.strikes || 0) + 1;
-            console.log(`تحديث السترايك للاعب ${currentTurnPlayer}: ${strikes}`);
-            
-            // تحديث عدد السترايكات
-            data.players[currentTurnPlayer].strikes = strikes;
-            
-            // إذا وصل عدد السترايكات إلى 3
-            if (strikes >= 3) {
-                // أضف نقطة للخصم
-                const opponent = currentTurnPlayer === 'player1' ? 'player2' : 'player1';
-                data.players[opponent].score = (data.players[opponent]?.score || 0) + 1;
-                
-                // أعد تعيين السترايكات
-                data.players[currentTurnPlayer].strikes = 0;
-                data.players[opponent].strikes = 0;
-                
-                // إعادة تعيين السكيب لكلا اللاعبين للسؤال القادم
-                if (!data.gameState.skipUsed) data.gameState.skipUsed = {};
-                if (!data.gameState.skipUsed.player1) data.gameState.skipUsed.player1 = {};
-                if (!data.gameState.skipUsed.player2) data.gameState.skipUsed.player2 = {};
-                
-                // الانتقال إلى السؤال التالي
-                data.gameState.currentQuestion = (data.gameState.currentQuestion + 1);
-                
-                // التحقق من انتهاء الأسئلة (5 أسئلة)
-                if (data.gameState.currentQuestion >= 5) {
-                    // تعليم الجولة كمنتهية
-                    data.gameState.roundCompleted = true;
-                }
-                
-                // إعادة تعيين الإجابات المستخدمة للسؤال الجديد
-                data.gameState.usedAnswers = {};
-            }
-            
-            // تغيير الدور
-            const nextPlayer = currentTurnPlayer === 'player1' ? 'player2' : 'player1';
-            data.gameState.currentTurn = nextPlayer;
-            
-            return data;
-        }).then(() => {
-            // التحقق من انتهاء الجولة بعد إجراء التحديث
-            checkRoundCompletion();
-        });
-    }
     
     // معالجة سكيب السؤال
     skipButton.addEventListener('click', function() {
@@ -556,10 +622,18 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
             // تغيير الدور
             data.gameState.currentTurn = opponentId;
             
+            // إعادة تعيين المؤقت
+            data.gameState.timerActive = false;
+            data.gameState.timerExpired = false;
+            data.gameState.timerEndTime = 0;
+            
             return data;
+        }).then(() => {
+            showStatus('تم استخدام السكيب', 'info');
+            
+            // بدء دور جديد للاعب التالي
+            startNewTurnForNextPlayer();
         });
-        
-        showStatus('تم استخدام السكيب', 'info');
     });
     
     // معالجة الضغط على Enter في حقل الإجابة
@@ -569,4 +643,14 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
             submitButton.click();
         }
     });
+    
+    // التحقق من وجود معلومات اللاعب
+    function checkPlayerInfo() {
+        if (!localStorage.getItem('playerName') || !localStorage.getItem('playerId') || !localStorage.getItem('roomCode')) {
+            alert('معلومات اللاعب غير موجودة. سيتم توجيهك إلى الصفحة الرئيسية.');
+            window.location.href = 'index.html';
+            return false;
+        }
+        return true;
+    }
 });
