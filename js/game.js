@@ -132,7 +132,6 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
         localTimerInterval = null;
     }
     
-    // عرض الوقت المتبقي لجميع اللاعبين
     if (!isActive) {
         timerElement.textContent = "0";
         timerElement.style.backgroundColor = '#F24C4C';
@@ -153,11 +152,8 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
         timerElement.style.backgroundColor = '#22A699';
     }
     
-    // تشغيل المؤقت فقط للاعب الذي حان دوره
-    const isPlayerTurn = currentTurn === playerId;
-    
-    // بدء مؤقت محلي للعد التنازلي فقط إذا كان دور اللاعب الحالي
-    if (isActive && timeLeft > 0 && isPlayerTurn) {
+    // بدء مؤقت محلي للعد التنازلي لجميع اللاعبين
+    if (isActive && timeLeft > 0) {
         localTimerInterval = setInterval(function() {
             const currentTime = Date.now() + serverTimeOffset;
             timeLeft = Math.max(0, Math.ceil((endTime - currentTime) / 1000));
@@ -176,7 +172,11 @@ function updateTimerDisplay(endTime, isActive, currentTurn) {
                 localTimerInterval = null;
                 
                 // فقط اللاعب الذي هو دوره يقوم بمعالجة انتهاء الوقت
-                handleTimeout();
+                roomRef.child('gameState/currentTurn').once('value', function(snapshot) {
+                    if (snapshot.val() === playerId) {
+                        handleTimeout();
+                    }
+                });
             }
         }, 500);
     }
